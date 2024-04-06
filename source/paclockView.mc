@@ -12,6 +12,7 @@ class paclockView extends WatchUi.WatchFace {
 
     private var _iconFont as FontResource?;
     private var _screenCenterPoint as Array<Number>?;
+    private var _sunTimes as Array<Time.Moment>?;
 
     private const MIN_PER_DAY = 24*60;
     private const TEXT_JUSTIFY = Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER;
@@ -46,10 +47,15 @@ class paclockView extends WatchUi.WatchFace {
         return (timeMinutes.toFloat() / MIN_PER_DAY * 360).toNumber();
     }
 
+    function compareHours(a as Gregorian.Info, b as Gregorian.Info) as Number {
+        var an = a.hour * 60 + a.min;
+        var bn = b.hour * 60 + b.min;
+        return bn - an;
+    }
+
     function drawSolarClock(dc as Dc) {
         var time = Time.now();
         var timeGregorian = Gregorian.info(time, Time.FORMAT_MEDIUM);
-        var positionInfo = Position.getInfo();
 
         var midnightOffset = 90;
         var thickness = 15;
@@ -59,25 +65,24 @@ class paclockView extends WatchUi.WatchFace {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         dc.clear();
         
-        // Sun icon
-        dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(_screenCenterPoint[0] + 15, _screenCenterPoint[1] - 53, _iconFont, "q", TEXT_JUSTIFY);
-
+        var positionInfo = Position.getInfo();
         var sunrise = Weather.getSunrise(positionInfo.position, time);
         var sunset = Weather.getSunset(positionInfo.position, time);
 
-        var sunReady = sunrise != null && sunset != null;
+        // position-dependent elements
+        if(sunrise != null && sunset != null) {
+            _sunTimes = [sunrise, sunset];
+        }
 
-        if(sunReady) {
-            var sunriseGreg = Gregorian.info(sunrise, Time.FORMAT_MEDIUM);
-            var sunsetGreg = Gregorian.info(sunset, Time.FORMAT_MEDIUM);
+        if(_sunTimes != null) {
+            var sunriseGreg = Gregorian.info(_sunTimes[0], Time.FORMAT_MEDIUM);
+            var sunsetGreg = Gregorian.info(_sunTimes[1], Time.FORMAT_MEDIUM);
             var nextSunType = 0;
-            if(time.lessThan(sunset) && time.greaterThan(sunrise)) {
+            if(compareHours(timeGregorian, sunsetGreg) >= 0 && compareHours(timeGregorian, sunriseGreg) < 0) {
                 nextSunType = 2;
             } else {
                 nextSunType = 1;
             }
-
 
             var setAngle = timeToAngle(sunsetGreg) + midnightOffset;
             var riseAngle = timeToAngle(sunriseGreg) + midnightOffset;
@@ -87,8 +92,11 @@ class paclockView extends WatchUi.WatchFace {
             drawArc(dc, _screenCenterPoint[0], _screenCenterPoint[1], radius-thickness, radius, riseAngle, setAngle);
             dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT);
             drawArc(dc, _screenCenterPoint[0], _screenCenterPoint[1], radius-thickness,  radius, setAngle-360, riseAngle);
+            dc.setColor(Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
+            drawArc(dc, _screenCenterPoint[0], _screenCenterPoint[1], radius-thickness,  radius, setAngle-5, setAngle+5);
+            drawArc(dc, _screenCenterPoint[0], _screenCenterPoint[1], radius-thickness,  radius, riseAngle-5, riseAngle+5);
 
-            // Sun rise/set
+            // Sun rise/set hour
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             if(nextSunType == 1) {
                 dc.drawText(_screenCenterPoint[0] + 54, _screenCenterPoint[1] - 50, Graphics.FONT_TINY, formatTime(sunriseGreg), TEXT_JUSTIFY);
@@ -100,15 +108,20 @@ class paclockView extends WatchUi.WatchFace {
             dc.drawText(_screenCenterPoint[0] + 54, _screenCenterPoint[1] - 50, Graphics.FONT_TINY, "--:--", TEXT_JUSTIFY);
         }
     
+        // Sun icon
+        dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(_screenCenterPoint[0] + 15, _screenCenterPoint[1] - 53, _iconFont, "q", TEXT_JUSTIFY);
+
         // Now hand
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
-        drawArc(dc, _screenCenterPoint[0], _screenCenterPoint[1], radius-thickness,  radius, nowAngle-2, nowAngle+2);
+        drawArc(dc, _screenCenterPoint[0], _screenCenterPoint[1], radius-thickness,  radius, nowAngle-3, nowAngle+3);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         drawArc(dc, _screenCenterPoint[0], _screenCenterPoint[1], radius-thickness,  radius, nowAngle-1, nowAngle+1);
 
         // Texts
 
         // Hour
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(_screenCenterPoint[0]-20, _screenCenterPoint[1], Graphics.FONT_NUMBER_HOT, pad(timeGregorian.hour), Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.drawText(_screenCenterPoint[0]-6, _screenCenterPoint[1], Graphics.FONT_NUMBER_HOT, pad(timeGregorian.min), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         if(timeGregorian.sec%2 == 0) {
@@ -120,8 +133,8 @@ class paclockView extends WatchUi.WatchFace {
         // Battery
         var systemStats = System.getSystemStats();  
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(_screenCenterPoint[0]-10, _screenCenterPoint[1] - 98, _iconFont, "S", TEXT_JUSTIFY);
-        dc.drawText(_screenCenterPoint[0] + 5, _screenCenterPoint[1] - 104, Graphics.FONT_XTINY, Lang.format("$1$ j", [systemStats.batteryInDays.format("%i")]), Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(_screenCenterPoint[0]-10, _screenCenterPoint[1] - 88, _iconFont, "S", TEXT_JUSTIFY);
+        dc.drawText(_screenCenterPoint[0] + 5, _screenCenterPoint[1] - 94, Graphics.FONT_XTINY, Lang.format("$1$ j", [systemStats.batteryInDays.format("%i")]), Graphics.TEXT_JUSTIFY_LEFT);
        
         // Lines
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
@@ -131,7 +144,7 @@ class paclockView extends WatchUi.WatchFace {
         var dateString = Lang.format("$1$ $2$", [timeGregorian.day_of_week, timeGregorian.day]);
         dc.drawText(_screenCenterPoint[0]-35, _screenCenterPoint[1] - 50, Graphics.FONT_TINY, dateString, TEXT_JUSTIFY);
 
-       // Temperature
+        // Temperature
         var temperatureIter = SensorHistory.getTemperatureHistory({});
         var lastTemp = temperatureIter.next().data;
         if(lastTemp != null) {
@@ -178,6 +191,16 @@ class paclockView extends WatchUi.WatchFace {
         */
         drawSolarClock(dc);
     }
+
+    /*
+    function onPartialUpdate(dc as Graphics.Dc) {
+        var time = Time.now();
+        var timeGregorian = Gregorian.info(time, Time.FORMAT_MEDIUM);
+
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(_screenCenterPoint[0]+93, _screenCenterPoint[1], Graphics.FONT_TINY, pad(timeGregorian.sec), TEXT_JUSTIFY);
+    }
+    */
 
     // Called when this View is removed from the screen. Save the
     // state of this View here. This includes freeing resources from
