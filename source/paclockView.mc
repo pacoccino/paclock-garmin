@@ -117,6 +117,12 @@ class paclockView extends WatchUi.WatchFace {
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(_screenCenterPoint[0]+93, _screenCenterPoint[1], Graphics.FONT_TINY, pad(timeGregorian.sec), TEXT_JUSTIFY);
        
+        // Battery
+        var systemStats = System.getSystemStats();  
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(_screenCenterPoint[0]-10, _screenCenterPoint[1] - 98, _iconFont, "S", TEXT_JUSTIFY);
+        dc.drawText(_screenCenterPoint[0] + 5, _screenCenterPoint[1] - 104, Graphics.FONT_XTINY, Lang.format("$1$ j", [systemStats.batteryInDays.format("%i")]), Graphics.TEXT_JUSTIFY_LEFT);
+       
         // Lines
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawLine(_screenCenterPoint[0], _screenCenterPoint[1] - 36, _screenCenterPoint[0], _screenCenterPoint[1] - 62);
@@ -125,12 +131,24 @@ class paclockView extends WatchUi.WatchFace {
         var dateString = Lang.format("$1$ $2$", [timeGregorian.day_of_week, timeGregorian.day]);
         dc.drawText(_screenCenterPoint[0]-35, _screenCenterPoint[1] - 50, Graphics.FONT_TINY, dateString, TEXT_JUSTIFY);
 
+       // Temperature
+        var temperatureIter = SensorHistory.getTemperatureHistory({});
+        var lastTemp = temperatureIter.next().data;
+        if(lastTemp != null) {
+            dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(_screenCenterPoint[0]-10, _screenCenterPoint[1] + 55, _iconFont, "X", TEXT_JUSTIFY);
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(_screenCenterPoint[0]+3, _screenCenterPoint[1] + 43, Graphics.FONT_TINY, Lang.format("$1$°", [lastTemp.format("%i")]), Graphics.TEXT_JUSTIFY_LEFT);
+        }
+
         // Heart rate
         var heartRateIter = SensorHistory.getHeartRateHistory({});
         var lastHR = heartRateIter.next().data;
         if(lastHR != null) {
+            dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
             dc.drawText(_screenCenterPoint[0]-10, _screenCenterPoint[1] + 80, _iconFont, "m", TEXT_JUSTIFY);
-            dc.drawText(_screenCenterPoint[0]+16, _screenCenterPoint[1] + 81, Graphics.FONT_TINY, lastHR, TEXT_JUSTIFY);
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(_screenCenterPoint[0]+3, _screenCenterPoint[1] + 68, Graphics.FONT_TINY, lastHR, Graphics.TEXT_JUSTIFY_LEFT);
         }
     }
 
